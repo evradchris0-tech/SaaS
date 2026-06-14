@@ -18,7 +18,7 @@ export class Round extends BaseEntity {
   expectedAmount: number;
 
   @Column({ type: 'uuid', nullable: true })
-  beneficiaryMembershipId: string;
+  beneficiaryMembershipId: string | null;
 
   @Column({ type: 'enum', enum: RoundStatus, default: RoundStatus.SCHEDULED })
   status: RoundStatus;
