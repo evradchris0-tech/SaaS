@@ -22,7 +22,7 @@ describe('AuthService', () => {
     });
 
     expect(res.accessToken).toBe('signed.jwt.token');
-    const created = users.create.mock.calls[0][0];
+    const created = users.create.mock.calls[0][0] as { passwordHash: string };
     expect(created.passwordHash).not.toBe('motdepasse1'); // hashé
     expect(await bcrypt.compare('motdepasse1', created.passwordHash)).toBe(
       true,
