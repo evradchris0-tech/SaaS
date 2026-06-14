@@ -6,7 +6,7 @@ export class Sprint4and5UpdatesV31781424436126 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Fix ledger_entries
     const entriesTable = await queryRunner.getTable('ledger_entries');
-    if (!entriesTable.findColumnByName('balanceAfter')) {
+    if (entriesTable && !entriesTable.findColumnByName('balanceAfter')) {
       await queryRunner.addColumn(
         'ledger_entries',
         new TableColumn({
