@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { FundType, TontineStatus } from '../../common/enums';
+import { FundType, Role, TontineStatus } from '../../common/enums';
+import { AddMemberDto } from './dto/add-member.dto';
 import { CreateTontineDto } from './dto/create-tontine.dto';
 import { Fund } from './fund.entity';
 import { Membership } from './membership.entity';
@@ -28,8 +30,11 @@ export class TontinesService {
     private readonly roundGenerator: RoundGeneratorService,
   ) {}
 
-  /** Crée une tontine DRAFT + ses 4 caisses, en une transaction atomique. */
-  async create(dto: CreateTontineDto): Promise<Tontine> {
+  /**
+   * Crée une tontine DRAFT + ses 4 caisses + le créateur comme Président,
+   * en une transaction atomique.
+   */
+  async create(dto: CreateTontineDto, creatorUserId: string): Promise<Tontine> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const tontine = manager.create(Tontine, {
         organizationId: dto.organizationId,
@@ -51,15 +56,68 @@ export class TontinesService {
       );
       await manager.save(funds);
 
+      // Le créateur devient automatiquement Président et premier membre actif.
+      const president = manager.create(Membership, {
+        tontineId: saved.id,
+        userId: creatorUserId,
+        role: Role.PRESIDENT,
+        status: 'ACTIVE',
+        shares: 1,
+      });
+      await manager.save(president);
+
       return saved;
     });
   }
 
   /**
+   * Ajoute un membre à une tontine encore en DRAFT. On fige la composition
+   * avant activation : pour les tontines rotatives, le calendrier est généré
+   * à partir de la liste des membres — l'ajout post-activation l'invaliderait.
+   */
+  async addMember(tontineId: string, dto: AddMemberDto): Promise<Membership> {
+    const tontine = await this.dataSource
+      .getRepository(Tontine)
+      .findOne({ where: { id: tontineId } });
+    if (!tontine) {
+      throw new NotFoundException('Tontine introuvable');
+    }
+    if (tontine.status !== TontineStatus.DRAFT) {
+      throw new ConflictException(
+        'Des membres ne peuvent être ajoutés qu’à une tontine en DRAFT',
+      );
+    }
+
+    const membershipRepo = this.dataSource.getRepository(Membership);
+    const existing = await membershipRepo.findOne({
+      where: { tontineId, userId: dto.userId },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'Cet utilisateur est déjà membre de la tontine',
+      );
+    }
+
+    const membership = membershipRepo.create({
+      tontineId,
+      userId: dto.userId,
+      role: dto.role ?? Role.MEMBER,
+      status: 'ACTIVE',
+      shares: dto.shares ?? 1,
+    });
+    return membershipRepo.save(membership);
+  }
+
+  /**
    * Active une tontine DRAFT : génère le calendrier des Rounds via la Strategy
    * (moteur de Gemini) et passe le statut à ACTIVE — le tout en transaction.
+   * Réservé au Président de la tontine.
    */
-  async activate(id: string, startDate: Date): Promise<Tontine> {
+  async activate(
+    id: string,
+    startDate: Date,
+    requestingUserId: string,
+  ): Promise<Tontine> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const tontine = await manager.findOne(Tontine, { where: { id } });
       if (!tontine) {
@@ -77,6 +135,15 @@ export class TontinesService {
       if (members.length === 0) {
         throw new BadRequestException(
           'Impossible d’activer une tontine sans membre',
+        );
+      }
+
+      const isPresident = members.some(
+        (m) => m.userId === requestingUserId && m.role === Role.PRESIDENT,
+      );
+      if (!isPresident) {
+        throw new ForbiddenException(
+          'Seul le président de la tontine peut l’activer',
         );
       }
 

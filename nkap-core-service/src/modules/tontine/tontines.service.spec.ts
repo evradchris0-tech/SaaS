@@ -1,8 +1,11 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { TontinesService } from './tontines.service';
 import { Tontine } from './tontine.entity';
 import { Fund } from './fund.entity';
 import { Round } from './round.entity';
-import { TontineType, TontineStatus } from '../../common/enums';
+import { Membership } from './membership.entity';
+import { Role, TontineType, TontineStatus } from '../../common/enums';
 import { CreateTontineDto } from './dto/create-tontine.dto';
 import { RoundGeneratorService } from './services/round-generator.service';
 
@@ -11,67 +14,161 @@ const makeRoundGen = () =>
     generateSchedule: jest.fn(() => [{ index: 1 }, { index: 2 }]),
   }) as unknown as RoundGeneratorService;
 
+const CREATOR_ID = '99999999-9999-9999-9999-999999999999';
+
 describe('TontinesService', () => {
-  it('crée une tontine DRAFT + ses 4 caisses dans une transaction', async () => {
-    const created: Array<{ entity: unknown; value: any }> = [];
-    const manager = {
-      create: jest.fn((entity: unknown, value: unknown) => {
-        created.push({ entity, value });
-        return value;
-      }),
-      save: jest.fn(async (x: unknown) => x),
-    };
-    const dataSource = {
-      transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
-        cb(manager),
-      ),
-    } as unknown as import('typeorm').DataSource;
+  describe('create', () => {
+    it('crée une tontine DRAFT, ses 4 caisses et le Président (créateur)', async () => {
+      const created: Array<{ entity: unknown; value: any }> = [];
+      const manager = {
+        create: jest.fn((entity: unknown, value: unknown) => {
+          created.push({ entity, value });
+          return value;
+        }),
+        save: jest.fn(async (x: unknown) => x),
+      };
+      const dataSource = {
+        transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
+          cb(manager),
+        ),
+      } as unknown as DataSource;
 
-    const service = new TontinesService(dataSource, makeRoundGen());
-    const dto: CreateTontineDto = {
-      organizationId: '11111111-1111-1111-1111-111111111111',
-      name: 'Njangi des amis',
-      type: TontineType.ROTATING,
-      currency: 'XAF',
-      ruleSet: {} as never,
-    };
+      const service = new TontinesService(dataSource, makeRoundGen());
+      const dto: CreateTontineDto = {
+        organizationId: '11111111-1111-1111-1111-111111111111',
+        name: 'Njangi des amis',
+        type: TontineType.ROTATING,
+        currency: 'XAF',
+        ruleSet: {} as never,
+      };
 
-    await service.create(dto);
+      await service.create(dto, CREATOR_ID);
 
-    const tontineCalls = created.filter((c) => c.entity === Tontine);
-    expect(tontineCalls).toHaveLength(1);
-    expect(tontineCalls[0].value.status).toBe(TontineStatus.DRAFT);
+      const tontineCalls = created.filter((c) => c.entity === Tontine);
+      expect(tontineCalls).toHaveLength(1);
+      expect(tontineCalls[0].value.status).toBe(TontineStatus.DRAFT);
 
-    const fundCalls = created.filter((c) => c.entity === Fund);
-    expect(fundCalls).toHaveLength(4);
-    expect(fundCalls.map((c) => c.value.type).sort()).toEqual(
-      ['MAIN', 'PENALTY', 'PLATFORM', 'SOCIAL'].sort(),
-    );
+      const fundCalls = created.filter((c) => c.entity === Fund);
+      expect(fundCalls).toHaveLength(4);
+      expect(fundCalls.map((c) => c.value.type).sort()).toEqual(
+        ['MAIN', 'PENALTY', 'PLATFORM', 'SOCIAL'].sort(),
+      );
+
+      const membershipCalls = created.filter((c) => c.entity === Membership);
+      expect(membershipCalls).toHaveLength(1);
+      expect(membershipCalls[0].value).toMatchObject({
+        userId: CREATOR_ID,
+        role: Role.PRESIDENT,
+        status: 'ACTIVE',
+      });
+    });
   });
 
-  it('active une tontine DRAFT : génère les rounds et passe ACTIVE', async () => {
-    const tontine: any = {
-      id: 't1',
-      type: TontineType.ROTATING,
-      status: TontineStatus.DRAFT,
+  describe('addMember', () => {
+    const buildDataSource = (overrides: {
+      tontine?: unknown;
+      existingMember?: unknown;
+    }) => {
+      const tontineRepo = {
+        findOne: jest.fn(async () => overrides.tontine ?? null),
+      };
+      const membershipRepo = {
+        findOne: jest.fn(async () => overrides.existingMember ?? null),
+        create: jest.fn((v: unknown) => v),
+        save: jest.fn(async (v: unknown) => ({
+          id: 'new-mem',
+          ...(v as object),
+        })),
+      };
+      const dataSource = {
+        getRepository: jest.fn((entity: unknown) =>
+          entity === Tontine ? tontineRepo : membershipRepo,
+        ),
+      } as unknown as DataSource;
+      return { dataSource, membershipRepo };
     };
-    const manager = {
-      findOne: jest.fn(async () => tontine),
-      find: jest.fn(async () => [{ id: 'm1' }, { id: 'm2' }]),
-      save: jest.fn(async (a: unknown, b?: unknown) => b ?? a),
+
+    it('ajoute un membre MEMBER à une tontine DRAFT', async () => {
+      const { dataSource, membershipRepo } = buildDataSource({
+        tontine: { id: 't1', status: TontineStatus.DRAFT },
+      });
+      const service = new TontinesService(dataSource, makeRoundGen());
+
+      const result: any = await service.addMember('t1', {
+        userId: '22222222-2222-2222-2222-222222222222',
+      });
+
+      expect(membershipRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: Role.MEMBER, status: 'ACTIVE' }),
+      );
+      expect(result.id).toBe('new-mem');
+    });
+
+    it('refuse un doublon de membre (409)', async () => {
+      const { dataSource } = buildDataSource({
+        tontine: { id: 't1', status: TontineStatus.DRAFT },
+        existingMember: { id: 'm0' },
+      });
+      const service = new TontinesService(dataSource, makeRoundGen());
+
+      await expect(
+        service.addMember('t1', {
+          userId: '22222222-2222-2222-2222-222222222222',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('activate', () => {
+    const buildManager = (members: unknown[]) => {
+      const tontine: any = {
+        id: 't1',
+        type: TontineType.ROTATING,
+        status: TontineStatus.DRAFT,
+      };
+      return {
+        findOne: jest.fn(async () => tontine),
+        find: jest.fn(async () => members),
+        save: jest.fn(async (a: unknown, b?: unknown) => b ?? a),
+      };
     };
-    const dataSource = {
-      transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
-        cb(manager),
-      ),
-    } as unknown as import('typeorm').DataSource;
-    const roundGen = makeRoundGen();
 
-    const service = new TontinesService(dataSource, roundGen);
-    const result: any = await service.activate('t1', new Date());
+    it('génère les rounds et passe ACTIVE quand le Président active', async () => {
+      const manager = buildManager([
+        { id: 'm1', userId: CREATOR_ID, role: Role.PRESIDENT },
+        { id: 'm2', userId: 'u2', role: Role.MEMBER },
+      ]);
+      const dataSource = {
+        transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
+          cb(manager),
+        ),
+      } as unknown as DataSource;
+      const roundGen = makeRoundGen();
 
-    expect(roundGen.generateSchedule).toHaveBeenCalledTimes(1);
-    expect(manager.save).toHaveBeenCalledWith(Round, expect.any(Array));
-    expect(result.status).toBe(TontineStatus.ACTIVE);
+      const service = new TontinesService(dataSource, roundGen);
+      const result: any = await service.activate('t1', new Date(), CREATOR_ID);
+
+      expect(roundGen.generateSchedule).toHaveBeenCalledTimes(1);
+      expect(manager.save).toHaveBeenCalledWith(Round, expect.any(Array));
+      expect(result.status).toBe(TontineStatus.ACTIVE);
+    });
+
+    it('refuse l’activation par un non-président (403)', async () => {
+      const manager = buildManager([
+        { id: 'm1', userId: CREATOR_ID, role: Role.PRESIDENT },
+        { id: 'm2', userId: 'u2', role: Role.MEMBER },
+      ]);
+      const dataSource = {
+        transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
+          cb(manager),
+        ),
+      } as unknown as DataSource;
+
+      const service = new TontinesService(dataSource, makeRoundGen());
+
+      await expect(
+        service.activate('t1', new Date(), 'u2'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });
