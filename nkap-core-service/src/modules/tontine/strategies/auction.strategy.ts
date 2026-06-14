@@ -10,7 +10,7 @@ import { RuleSet } from '../interfaces/rule-set.interface';
 export class AuctionStrategy implements TontineStrategy {
   generateRounds(params: RoundGenerationParams): Round[] {
     const { tontine, members, startDate } = params;
-    const ruleSet = tontine.ruleSet as RuleSet;
+    const ruleSet = tontine.ruleSet;
     const rounds: Round[] = [];
 
     const totalRounds = members.length;
