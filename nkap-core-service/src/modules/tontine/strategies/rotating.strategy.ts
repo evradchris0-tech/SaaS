@@ -20,7 +20,8 @@ export class RotatingStrategy implements TontineStrategy {
     for (let i = 0; i < totalRounds; i++) {
       const round = new Round();
       round.index = i + 1;
-      round.expectedAmount = ruleSet.contribution.amountPerShare;
+      round.expectedAmount =
+        ruleSet.contribution.amountPerShare * members.length;
       round.dueDate = new Date(currentDate);
       round.status = RoundStatus.SCHEDULED;
 
