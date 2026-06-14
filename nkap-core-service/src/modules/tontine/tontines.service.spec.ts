@@ -171,4 +171,56 @@ describe('TontinesService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
+
+  describe('assertMembershipRole', () => {
+    const buildDataSource = (membership: unknown) => {
+      const repo = { findOne: jest.fn(async () => membership) };
+      return {
+        getRepository: jest.fn(() => repo),
+      } as unknown as DataSource;
+    };
+
+    it('passe quand le membre possède un rôle autorisé', async () => {
+      const service = new TontinesService(
+        buildDataSource({ role: Role.TREASURER }),
+        makeRoundGen(),
+      );
+      await expect(
+        service.assertMembershipRole('t1', 'u1', [
+          Role.PRESIDENT,
+          Role.TREASURER,
+        ]),
+      ).resolves.toBeUndefined();
+    });
+
+    it('passe pour tout membre quand aucun rôle n’est exigé', async () => {
+      const service = new TontinesService(
+        buildDataSource({ role: Role.MEMBER }),
+        makeRoundGen(),
+      );
+      await expect(
+        service.assertMembershipRole('t1', 'u1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('refuse un non-membre (403)', async () => {
+      const service = new TontinesService(
+        buildDataSource(null),
+        makeRoundGen(),
+      );
+      await expect(
+        service.assertMembershipRole('t1', 'u1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuse un rôle insuffisant (403)', async () => {
+      const service = new TontinesService(
+        buildDataSource({ role: Role.MEMBER }),
+        makeRoundGen(),
+      );
+      await expect(
+        service.assertMembershipRole('t1', 'u1', [Role.PRESIDENT]),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
 });
