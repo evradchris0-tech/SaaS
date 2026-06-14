@@ -1,5 +1,6 @@
 version: 2
 updates:
+  # --- Backend NestJS ---
   - package-ecosystem: npm
     directory: /nkap-core-service
     schedule:
@@ -8,15 +9,37 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      core-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    # Les montées MAJEURES sont adoptées manuellement (risque de breaking change).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # --- Outillage racine (husky, commitlint, lint-staged, prettier) ---
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     commit-message:
       prefix: chore
+    groups:
+      root-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # --- GitHub Actions ---
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     commit-message:
       prefix: ci
+    groups:
+      gh-actions:
+        patterns: ["*"]

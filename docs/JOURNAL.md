@@ -9,6 +9,20 @@
 
 ---
 
+## 2026-06-14 08:27 (UTC+1) — [Claude] — 🚀 Dépôt EN LIGNE
+
+- `git push` OK : **`main` + `develop`** sur GitHub (commit `6d24be0`). Credential helper du repo épinglé sur **`wincred`** (fini les conflits avec GCM).
+- Auth réglée proprement : ancien token (exposé dans le chat) **révoqué**, nouveau token `nkap-dev` (scope `repo`+`workflow`) rangé dans Windows Credential Manager ; nettoyage des credentials GitHub périmés.
+- **Dependabot déjà actif** : PRs ouvertes (github-actions + npm). ⚠️ Vérifier le bump `typeorm` proposé (ne pas merger un major à l'aveugle).
+- Reste : activer la **protection de `main`** (UI, après le 1ᵉʳ run CI) ; brancher les **migrations TypeORM** (Claude).
+
+## 2026-06-14 08:07 (UTC+1) — [Claude] — Bootstrap commité (push à finaliser)
+
+- Build ✅ (exit 0) + tests ✅ (6/6, 2 suites) après install propre (749 paquets, 0 vuln) — l'install échouait à cause de la corruption tar (installs concurrents) + verrou Defender ; réglé par exclusion Defender + install unique.
+- Git : `master`→`main`, **commit bootstrap `6d24be0`** (60 fichiers ; hooks prettier + commitlint OK), branche `develop` créée.
+- ⛔ **Push bloqué** : le PAT GitHub n'a pas le scope `workflow` (refuse de créer `.github/workflows/*`). → Chris ajoute le scope `workflow` au token, puis re-push.
+- Protection de branche `main` : à activer via l'UI GitHub (`gh` non installé).
+
 ## 2026-06-14 06:57 (UTC+1) — [Claude] — Règles du dépôt (config entreprise)
 
 - Outillage qualité racine installé : **Husky** (hooks actifs), **commitlint** (Conventional Commits), **lint-staged** (prettier au pre-commit).
