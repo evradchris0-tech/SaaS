@@ -21,6 +21,8 @@ describe('TontinesService', () => {
     it('crée une tontine DRAFT, ses 4 caisses et le Président (créateur)', async () => {
       const created: Array<{ entity: unknown; value: any }> = [];
       const manager = {
+        // L'utilisateur appartient bien à l'organisation (enforcement multi-tenant).
+        findOne: jest.fn(async () => ({ id: 'om1' })),
         create: jest.fn((entity: unknown, value: unknown) => {
           created.push({ entity, value });
           return value;
@@ -61,6 +63,31 @@ describe('TontinesService', () => {
         role: Role.PRESIDENT,
         status: 'ACTIVE',
       });
+    });
+
+    it('refuse la création si le créateur n’appartient pas à l’organisation (403)', async () => {
+      const manager = {
+        findOne: jest.fn(async () => null),
+        create: jest.fn((_e: unknown, v: unknown) => v),
+        save: jest.fn(async (x: unknown) => x),
+      };
+      const dataSource = {
+        transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
+          cb(manager),
+        ),
+      } as unknown as DataSource;
+      const service = new TontinesService(dataSource, makeRoundGen());
+      const dto: CreateTontineDto = {
+        organizationId: '11111111-1111-1111-1111-111111111111',
+        name: 'X',
+        type: TontineType.ROTATING,
+        currency: 'XAF',
+        ruleSet: {} as never,
+      };
+
+      await expect(service.create(dto, CREATOR_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
   });
 

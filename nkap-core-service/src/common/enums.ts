@@ -86,3 +86,10 @@ export enum ObligationStatus {
   DEFAULTED = 'DEFAULTED',
   WRITTEN_OFF = 'WRITTEN_OFF',
 }
+
+/** Rôle d'un utilisateur au sein d'une organisation (multi-tenant). */
+export enum OrgRole {
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
+  MEMBER = 'MEMBER',
+}
