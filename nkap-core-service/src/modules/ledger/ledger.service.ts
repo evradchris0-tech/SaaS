@@ -3,7 +3,7 @@ import {
   ConflictException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { LedgerTransaction } from './ledger-transaction.entity';
 import { LedgerEntry } from './ledger-entry.entity';
 import { Fund } from '../tontine/fund.entity';
@@ -32,10 +32,14 @@ export class LedgerService {
 
   async recordTransaction(
     dto: RecordTransactionDto,
+    externalQueryRunner?: QueryRunner,
   ): Promise<LedgerTransaction> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const queryRunner =
+      externalQueryRunner || this.dataSource.createQueryRunner();
+    if (!externalQueryRunner) {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+    }
 
     try {
       const existingTx = await queryRunner.manager.findOne(LedgerTransaction, {
@@ -107,13 +111,19 @@ export class LedgerService {
 
       await queryRunner.manager.save([fundEntry, counterpartEntry]);
 
-      await queryRunner.commitTransaction();
+      if (!externalQueryRunner) {
+        await queryRunner.commitTransaction();
+      }
       return savedTransaction;
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (!externalQueryRunner) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
-      await queryRunner.release();
+      if (!externalQueryRunner) {
+        await queryRunner.release();
+      }
     }
   }
 }

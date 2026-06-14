@@ -9,6 +9,7 @@ import { TontinesService } from './tontines.service';
 import { RoundGeneratorService } from './services/round-generator.service';
 import { TontineStrategyFactory } from './strategies/tontine-strategy.factory';
 import { ContributionService } from './services/contribution.service';
+import { PayoutService } from './services/payout.service';
 import { LedgerModule } from '../ledger/ledger.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { LedgerModule } from '../ledger/ledger.module';
     RoundGeneratorService,
     TontineStrategyFactory,
     ContributionService,
+    PayoutService,
   ],
 })
 export class TontinesModule {}
