@@ -109,6 +109,28 @@ export class TontinesService {
   }
 
   /**
+   * Vérifie que l'utilisateur est membre de la tontine (et possède l'un des
+   * rôles requis, le cas échéant). Lève ForbiddenException sinon.
+   */
+  async assertMembershipRole(
+    tontineId: string,
+    userId: string,
+    roles?: Role[],
+  ): Promise<void> {
+    const membership = await this.dataSource
+      .getRepository(Membership)
+      .findOne({ where: { tontineId, userId } });
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette tontine");
+    }
+    if (roles && roles.length > 0 && !roles.includes(membership.role)) {
+      throw new ForbiddenException(
+        'Rôle insuffisant pour effectuer cette opération',
+      );
+    }
+  }
+
+  /**
    * Active une tontine DRAFT : génère le calendrier des Rounds via la Strategy
    * (moteur de Gemini) et passe le statut à ACTIVE — le tout en transaction.
    * Réservé au Président de la tontine.
