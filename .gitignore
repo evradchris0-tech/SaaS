@@ -19,4 +19,4 @@
 !.vscode/extensions.json
 
 # Canal de communication des agents (local, non versionné)
-docs/AGENT_COMMS.md
+docs/SYNC.md
