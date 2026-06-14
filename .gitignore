@@ -1,0 +1,19 @@
+# Dépendances
+**/node_modules/
+
+# Build & couverture
+**/dist/
+**/coverage/
+*.tsbuildinfo
+
+# Env & secrets (ne JAMAIS committer)
+.env
+**/.env
+!**/.env.example
+
+# Logs / OS / IDE
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

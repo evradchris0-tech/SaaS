@@ -1,0 +1,23 @@
+# Environnement de dev local — parité avec la prod (PostgreSQL).
+# Usage : docker compose up -d   (puis npm run start:dev)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nkap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-nkap}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nkap}
+      POSTGRES_DB: ${DB_NAME:-nkap_dev}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - nkap_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-nkap}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  nkap_pgdata:

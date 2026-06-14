@@ -1,0 +1,30 @@
+name: 🐛 Bug
+description: Signaler un dysfonctionnement
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Description
+      description: Que se passe-t-il ?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environnement (OS, Node, version)
