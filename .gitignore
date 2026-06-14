@@ -17,3 +17,6 @@
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Canal de communication des agents (local, non versionné)
+docs/SYNC.md
