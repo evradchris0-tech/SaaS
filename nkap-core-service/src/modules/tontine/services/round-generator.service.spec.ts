@@ -46,9 +46,9 @@ describe('RoundGeneratorService', () => {
 
     expect(rounds.length).toBe(3);
 
-    // Round 1
+    // Round 1 — cagnotte globale = amountPerShare * nombre de membres (50000 * 3)
     expect(rounds[0].index).toBe(1);
-    expect(rounds[0].expectedAmount).toBe(50000);
+    expect(rounds[0].expectedAmount).toBe(150000);
     expect(rounds[0].beneficiaryMembershipId).toBe('m1');
     expect(rounds[0].dueDate.toISOString()).toBe('2026-07-01T00:00:00.000Z');
 

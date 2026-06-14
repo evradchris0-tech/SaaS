@@ -2,7 +2,6 @@ import { E2eTestHelper } from './helpers/e2e-test.helper';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { TontineType, TransactionType } from '../src/common/enums';
-import { DataSource } from 'typeorm';
 
 describe('Tontine Lifecycle (e2e)', () => {
   const helper = new E2eTestHelper();
@@ -98,13 +97,6 @@ describe('Tontine Lifecycle (e2e)', () => {
     tontineId = tontineRes.body.id;
     // The president is auto-added as member
 
-    // Fetch members to get President's membershipId
-    const memRes1 = await request(server)
-      .get(`/tontines/${tontineId}`)
-      .set('Authorization', `Bearer ${presidentToken}`);
-    // Wait, we don't have GET /tontines/:id/members yet? Let's check DB directly if needed.
-    // Or we can add member 2 and get response.
-
     // 5. Add Member 2
     const addMemRes = await request(server)
       .post(`/tontines/${tontineId}/members`)
@@ -118,7 +110,7 @@ describe('Tontine Lifecycle (e2e)', () => {
       `SELECT id, "userId" FROM memberships WHERE "tontineId" = '${tontineId}'`,
     );
     presidentMembershipId = memberships.find(
-      (m) => m.userId === presidentUserId,
+      (m: { id: string; userId: string }) => m.userId === presidentUserId,
     ).id;
 
     // 6. Activate Tontine
