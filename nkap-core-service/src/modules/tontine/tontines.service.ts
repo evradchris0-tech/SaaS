@@ -13,6 +13,7 @@ import { Fund } from './fund.entity';
 import { Membership } from './membership.entity';
 import { Round } from './round.entity';
 import { Tontine } from './tontine.entity';
+import { OrganizationMembership } from '../organization/organization-membership.entity';
 import { RoundGeneratorService } from './services/round-generator.service';
 
 /** Les 4 caisses créées automatiquement à la naissance d'une tontine. */
@@ -36,6 +37,16 @@ export class TontinesService {
    */
   async create(dto: CreateTontineDto, creatorUserId: string): Promise<Tontine> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
+      // Multi-tenant : le créateur doit appartenir à l'organisation cible.
+      const orgMembership = await manager.findOne(OrganizationMembership, {
+        where: { organizationId: dto.organizationId, userId: creatorUserId },
+      });
+      if (!orgMembership) {
+        throw new ForbiddenException(
+          "Vous n'appartenez pas à cette organisation",
+        );
+      }
+
       const tontine = manager.create(Tontine, {
         organizationId: dto.organizationId,
         name: dto.name,
@@ -111,7 +122,6 @@ export class TontinesService {
       userId: dto.userId,
       role: dto.role ?? Role.MEMBER,
       status: 'ACTIVE',
-      shares: dto.shares ?? 1,
     });
     return membershipRepo.save(membership);
   }
@@ -161,6 +171,7 @@ export class TontinesService {
 
       const members = await manager.find(Membership, {
         where: { tontineId: id },
+        order: { createdAt: 'ASC' },
       });
       if (members.length === 0) {
         throw new BadRequestException(

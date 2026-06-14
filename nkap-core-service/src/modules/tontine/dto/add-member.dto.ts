@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '../../../common/enums';
 
@@ -15,14 +15,4 @@ export class AddMemberDto {
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
-
-  @ApiPropertyOptional({
-    default: 1,
-    minimum: 1,
-    description: 'Nombre de parts détenues par le membre',
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  shares?: number;
 }
