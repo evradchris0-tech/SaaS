@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Test, TestingModule } from '@nestjs/testing';
 import { RoundGeneratorService } from './round-generator.service';
 import { TontineStrategyFactory } from '../strategies/tontine-strategy.factory';
