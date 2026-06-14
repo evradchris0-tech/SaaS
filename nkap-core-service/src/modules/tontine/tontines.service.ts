@@ -75,13 +75,21 @@ export class TontinesService {
    * avant activation : pour les tontines rotatives, le calendrier est généré
    * à partir de la liste des membres — l'ajout post-activation l'invaliderait.
    */
-  async addMember(tontineId: string, dto: AddMemberDto): Promise<Membership> {
+  async addMember(
+    tontineId: string,
+    dto: AddMemberDto,
+    requestingUserId: string,
+  ): Promise<Membership> {
     const tontine = await this.dataSource
       .getRepository(Tontine)
       .findOne({ where: { id: tontineId } });
     if (!tontine) {
       throw new NotFoundException('Tontine introuvable');
     }
+    // Seul le Président de la tontine peut composer la liste des membres.
+    await this.assertMembershipRole(tontineId, requestingUserId, [
+      Role.PRESIDENT,
+    ]);
     if (tontine.status !== TontineStatus.DRAFT) {
       throw new ConflictException(
         'Des membres ne peuvent être ajoutés qu’à une tontine en DRAFT',

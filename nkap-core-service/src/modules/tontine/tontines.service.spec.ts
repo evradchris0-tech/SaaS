@@ -67,13 +67,23 @@ describe('TontinesService', () => {
   describe('addMember', () => {
     const buildDataSource = (overrides: {
       tontine?: unknown;
+      requesterRole?: Role | null;
       existingMember?: unknown;
     }) => {
       const tontineRepo = {
         findOne: jest.fn(async () => overrides.tontine ?? null),
       };
+      // 1er findOne = vérif du rôle du demandeur (assertMembershipRole) ;
+      // 2e findOne = détection de doublon.
       const membershipRepo = {
-        findOne: jest.fn(async () => overrides.existingMember ?? null),
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(
+            overrides.requesterRole === null
+              ? null
+              : { role: overrides.requesterRole ?? Role.PRESIDENT },
+          )
+          .mockResolvedValueOnce(overrides.existingMember ?? null),
         create: jest.fn((v: unknown) => v),
         save: jest.fn(async (v: unknown) => ({
           id: 'new-mem',
@@ -88,15 +98,18 @@ describe('TontinesService', () => {
       return { dataSource, membershipRepo };
     };
 
-    it('ajoute un membre MEMBER à une tontine DRAFT', async () => {
+    it('ajoute un membre MEMBER quand le demandeur est Président', async () => {
       const { dataSource, membershipRepo } = buildDataSource({
         tontine: { id: 't1', status: TontineStatus.DRAFT },
+        requesterRole: Role.PRESIDENT,
       });
       const service = new TontinesService(dataSource, makeRoundGen());
 
-      const result: any = await service.addMember('t1', {
-        userId: '22222222-2222-2222-2222-222222222222',
-      });
+      const result: any = await service.addMember(
+        't1',
+        { userId: '22222222-2222-2222-2222-222222222222' },
+        'pres-1',
+      );
 
       expect(membershipRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ role: Role.MEMBER, status: 'ACTIVE' }),
@@ -104,17 +117,28 @@ describe('TontinesService', () => {
       expect(result.id).toBe('new-mem');
     });
 
+    it('refuse l’ajout par un non-président (403)', async () => {
+      const { dataSource } = buildDataSource({
+        tontine: { id: 't1', status: TontineStatus.DRAFT },
+        requesterRole: Role.MEMBER,
+      });
+      const service = new TontinesService(dataSource, makeRoundGen());
+
+      await expect(
+        service.addMember('t1', { userId: 'u2' }, 'member-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
     it('refuse un doublon de membre (409)', async () => {
       const { dataSource } = buildDataSource({
         tontine: { id: 't1', status: TontineStatus.DRAFT },
+        requesterRole: Role.PRESIDENT,
         existingMember: { id: 'm0' },
       });
       const service = new TontinesService(dataSource, makeRoundGen());
 
       await expect(
-        service.addMember('t1', {
-          userId: '22222222-2222-2222-2222-222222222222',
-        }),
+        service.addMember('t1', { userId: 'u2' }, 'pres-1'),
       ).rejects.toBeInstanceOf(ConflictException);
     });
   });
