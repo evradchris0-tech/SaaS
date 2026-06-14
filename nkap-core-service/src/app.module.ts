@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { TontinesModule } from './modules/tontine/tontines.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AppService } from './app.service';
         logging: config.get<string>('DB_LOGGING') === 'true',
       }),
     }),
+    TontinesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
