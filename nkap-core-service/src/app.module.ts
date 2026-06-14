@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
+import { OrganizationsModule } from './modules/organization/organizations.module';
 import { TontinesModule } from './modules/tontine/tontines.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { TontinesModule } from './modules/tontine/tontines.module';
       }),
     }),
     AuthModule,
+    OrganizationsModule,
     TontinesModule,
   ],
   controllers: [AppController],
