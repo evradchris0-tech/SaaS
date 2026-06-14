@@ -1,12 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { PenaltyService } from '../services/penalty.service';
 
 @Injectable()
-export class PenaltyCronService {
+export class PenaltyCronService implements OnApplicationShutdown {
   private readonly logger = new Logger(PenaltyCronService.name);
 
-  constructor(private readonly penaltyService: PenaltyService) {}
+  constructor(
+    private readonly penaltyService: PenaltyService,
+    private readonly schedulerRegistry: SchedulerRegistry,
+  ) {}
+
+  onApplicationShutdown() {
+    const jobs = this.schedulerRegistry.getCronJobs();
+    for (const job of jobs.values()) {
+      job.stop();
+    }
+    this.logger.log('Cron jobs stopped gracefully on application shutdown.');
+  }
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleCron() {
