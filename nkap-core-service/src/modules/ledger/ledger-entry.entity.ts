@@ -9,7 +9,7 @@ export class LedgerEntry extends BaseEntity {
   @Index()
   transactionId: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   @Index()
   fundId: string;
 
@@ -21,6 +21,13 @@ export class LedgerEntry extends BaseEntity {
 
   @Column({ type: 'bigint', transformer: new BigIntTransformer() })
   amount: number;
+
+  @Column({
+    type: 'bigint',
+    transformer: new BigIntTransformer(),
+    nullable: true,
+  })
+  balanceAfter: number;
 
   @Column({ type: 'uuid', nullable: true })
   reversedEntryId: string; // Pour l'immuabilité : si l'écriture est annulée

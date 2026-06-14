@@ -8,10 +8,20 @@ import { TontinesController } from './tontines.controller';
 import { TontinesService } from './tontines.service';
 import { RoundGeneratorService } from './services/round-generator.service';
 import { TontineStrategyFactory } from './strategies/tontine-strategy.factory';
+import { ContributionService } from './services/contribution.service';
+import { LedgerModule } from '../ledger/ledger.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tontine, Fund, Membership, Round])],
+  imports: [
+    TypeOrmModule.forFeature([Tontine, Fund, Membership, Round]),
+    LedgerModule,
+  ],
   controllers: [TontinesController],
-  providers: [TontinesService, RoundGeneratorService, TontineStrategyFactory],
+  providers: [
+    TontinesService,
+    RoundGeneratorService,
+    TontineStrategyFactory,
+    ContributionService,
+  ],
 })
 export class TontinesModule {}

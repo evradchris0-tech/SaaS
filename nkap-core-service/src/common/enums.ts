@@ -49,6 +49,13 @@ export enum TransactionType {
   REVERSAL = 'REVERSAL',
 }
 
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REVERSED = 'REVERSED',
+}
+
 export enum EntryType {
   DEBIT = 'DEBIT',
   CREDIT = 'CREDIT',

@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { OrganizationsModule } from './modules/organization/organizations.module';
 import { TontinesModule } from './modules/tontine/tontines.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TontinesModule } from './modules/tontine/tontines.module';
     AuthModule,
     OrganizationsModule,
     TontinesModule,
+    LedgerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

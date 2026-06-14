@@ -45,7 +45,6 @@ export class CreateTontineDto {
   /** Règles de la tontine (validation fine déléguée au moteur BC2 — Sprint 2). */
   @ApiProperty({
     description: 'Règles mathématiques de la tontine',
-    type: 'object',
   })
   @IsObject()
   ruleSet: RuleSet;
