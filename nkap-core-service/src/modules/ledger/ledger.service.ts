@@ -76,8 +76,9 @@ export class LedgerService {
       let savedTransaction: LedgerTransaction;
       try {
         savedTransaction = await queryRunner.manager.save(transaction);
-      } catch (error: any) {
-        if (error.code === '23505') {
+      } catch (error) {
+        const pgCode = (error as { code?: string }).code;
+        if (pgCode === '23505') {
           throw new ConflictException(
             'Transaction already processed (Idempotency Key collision)',
           );

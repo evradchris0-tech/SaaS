@@ -11,10 +11,10 @@ export class PenaltyCronService implements OnApplicationShutdown {
     private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
 
-  onApplicationShutdown() {
+  async onApplicationShutdown() {
     const jobs = this.schedulerRegistry.getCronJobs();
     for (const job of jobs.values()) {
-      job.stop();
+      await job.stop();
     }
     this.logger.log('Cron jobs stopped gracefully on application shutdown.');
   }
