@@ -53,19 +53,29 @@ export class TontinesController {
     return this.tontinesService.create(dto, user.userId);
   }
 
-  /** Ajoute un membre à une tontine encore en DRAFT. */
+  /** Ajoute un membre à une tontine en DRAFT. Réservé au Président. */
   @Post(':id/members')
-  @ApiOperation({ summary: 'Ajouter un membre à une tontine (DRAFT)' })
+  @ApiOperation({
+    summary: 'Ajouter un membre à une tontine (Président, DRAFT)',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 201, description: 'Membre ajouté avec succès' })
   @ApiResponse({ status: 401, description: 'Non autorisé' })
+  @ApiResponse({
+    status: 403,
+    description: 'Seul le président de la tontine peut ajouter des membres',
+  })
   @ApiResponse({ status: 404, description: 'Tontine introuvable' })
   @ApiResponse({
     status: 409,
     description: 'Tontine non DRAFT ou utilisateur déjà membre',
   })
-  addMember(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AddMemberDto) {
-    return this.tontinesService.addMember(id, dto);
+  addMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddMemberDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.addMember(id, dto, user.userId);
   }
 
   /** Active une tontine (DRAFT -> ACTIVE) et génère ses Rounds. */
