@@ -54,6 +54,7 @@ export class LedgerService {
 
       const fund = await queryRunner.manager.findOne(Fund, {
         where: { id: dto.fundId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!fund) {
@@ -72,7 +73,17 @@ export class LedgerService {
         description: dto.description,
       });
 
-      const savedTransaction = await queryRunner.manager.save(transaction);
+      let savedTransaction: LedgerTransaction;
+      try {
+        savedTransaction = await queryRunner.manager.save(transaction);
+      } catch (error: any) {
+        if (error.code === '23505') {
+          throw new ConflictException(
+            'Transaction already processed (Idempotency Key collision)',
+          );
+        }
+        throw error;
+      }
 
       const balanceChange =
         dto.entryType === EntryType.CREDIT ? dto.amount : -dto.amount;
