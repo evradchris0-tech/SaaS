@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -11,6 +13,9 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Anti-abus : plafond global par IP (60 s). Les routes sensibles
+    // (cf. /auth) resserrent cette limite via @Throttle.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -34,6 +39,6 @@ import { LedgerModule } from './modules/ledger/ledger.module';
     LedgerModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

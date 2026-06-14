@@ -1,14 +1,15 @@
 import {
   IsEnum,
   IsNotEmpty,
-  IsObject,
   IsString,
   IsUUID,
   Length,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TontineType } from '../../../common/enums';
-import type { RuleSet } from '../interfaces/rule-set.interface';
 import { ApiProperty } from '@nestjs/swagger';
+import { RuleSetDto } from './rule-set.dto';
 
 export class CreateTontineDto {
   @ApiProperty({ description: "ID de l'organisation", format: 'uuid' })
@@ -42,10 +43,12 @@ export class CreateTontineDto {
   @Length(3, 3)
   currency: string;
 
-  /** Règles de la tontine (validation fine déléguée au moteur BC2 — Sprint 2). */
+  /** Règles mathématiques de la tontine — validées en profondeur (protège le moteur). */
   @ApiProperty({
     description: 'Règles mathématiques de la tontine',
+    type: RuleSetDto,
   })
-  @IsObject()
-  ruleSet: RuleSet;
+  @ValidateNested()
+  @Type(() => RuleSetDto)
+  ruleSet: RuleSetDto;
 }

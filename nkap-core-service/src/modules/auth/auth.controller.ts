@@ -1,9 +1,12 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
+// Anti-brute-force : 10 tentatives / minute / IP sur les routes d'authentification.
+@Throttle({ default: { ttl: 60000, limit: 10 } })
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
