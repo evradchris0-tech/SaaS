@@ -122,7 +122,6 @@ export class TontinesService {
       userId: dto.userId,
       role: dto.role ?? Role.MEMBER,
       status: 'ACTIVE',
-      shares: dto.shares ?? 1,
     });
     return membershipRepo.save(membership);
   }
@@ -172,6 +171,7 @@ export class TontinesService {
 
       const members = await manager.find(Membership, {
         where: { tontineId: id },
+        order: { createdAt: 'ASC' },
       });
       if (members.length === 0) {
         throw new BadRequestException(
