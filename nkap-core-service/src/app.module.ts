@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -13,6 +14,7 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     // Anti-abus : plafond global par IP (60 s). Les routes sensibles
     // (cf. /auth) resserrent cette limite via @Throttle.
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
