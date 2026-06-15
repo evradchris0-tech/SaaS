@@ -58,7 +58,7 @@ export class PenaltyService {
     const penaltyAmount =
       penaltyRules.type === 'FIXED'
         ? penaltyRules.value
-        : (Number(round.expectedAmount) * penaltyRules.value) / 100;
+        : Math.round((Number(round.expectedAmount) * penaltyRules.value) / 100);
 
     const strictDueDate = addDays(new Date(round.dueDate), graceDays);
     if (!isPast(strictDueDate)) {

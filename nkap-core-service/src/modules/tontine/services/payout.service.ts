@@ -3,11 +3,13 @@ import { DataSource } from 'typeorm';
 import { LedgerService } from '../../ledger/ledger.service';
 import { Round } from '../round.entity';
 import { Fund } from '../fund.entity';
+import { Tontine } from '../tontine.entity';
 import {
   RoundStatus,
   TransactionType,
   FundType,
   EntryType,
+  TontineStatus,
 } from '../../../common/enums';
 import { LedgerTransaction } from '../../ledger/ledger-transaction.entity';
 
@@ -28,6 +30,13 @@ export class PayoutService {
     await queryRunner.startTransaction();
 
     try {
+      const tontine = await queryRunner.manager.findOne(Tontine, {
+        where: { id: params.tontineId },
+      });
+      if (!tontine || tontine.status !== TontineStatus.ACTIVE) {
+        throw new BadRequestException('Tontine introuvable ou inactive.');
+      }
+
       const round = await queryRunner.manager.findOne(Round, {
         where: { id: params.roundId, tontineId: params.tontineId },
         lock: { mode: 'pessimistic_write' },

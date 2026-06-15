@@ -13,9 +13,17 @@ export class RotatingStrategy implements TontineStrategy {
     const ruleSet = tontine.ruleSet;
     const rounds: Round[] = [];
 
-    // Pour une tontine rotative, un tour de rôle complet = autant de rounds que de parts/membres
     const totalRounds = members.length;
     let currentDate = new Date(startDate);
+
+    const drawOrder = [...members];
+    if (ruleSet.beneficiary.order === 'RANDOM_DRAW') {
+      // Fisher-Yates shuffle
+      for (let i = drawOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [drawOrder[i], drawOrder[j]] = [drawOrder[j], drawOrder[i]];
+      }
+    }
 
     for (let i = 0; i < totalRounds; i++) {
       const round = new Round();
@@ -25,9 +33,14 @@ export class RotatingStrategy implements TontineStrategy {
       round.dueDate = new Date(currentDate);
       round.status = RoundStatus.SCHEDULED;
 
-      // Assigner un bénéficiaire fixe selon l'ordre des membres (Basic Rotating)
-      if (ruleSet.beneficiary.order === 'FIXED') {
-        round.beneficiaryMembershipId = members[i].id;
+      if (
+        ruleSet.beneficiary.order === 'FIXED' ||
+        ruleSet.beneficiary.order === 'RANDOM_DRAW'
+      ) {
+        round.beneficiaryMembershipId = drawOrder[i].id;
+      } else {
+        // NEED_BASED or AUCTION : leave null for now
+        round.beneficiaryMembershipId = null;
       }
 
       rounds.push(round);
@@ -58,7 +71,7 @@ export class RotatingStrategy implements TontineStrategy {
     if (penaltyRule.type === 'FIXED') {
       return penaltyRule.value;
     } else if (penaltyRule.type === 'PERCENT') {
-      return (expectedAmount * penaltyRule.value) / 100;
+      return Math.round((expectedAmount * penaltyRule.value) / 100);
     }
     return 0;
   }
