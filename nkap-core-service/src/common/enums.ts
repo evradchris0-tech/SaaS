@@ -4,6 +4,13 @@ export enum FundType {
   PENALTY = 'PENALTY',
   PLATFORM = 'PLATFORM',
   SAVINGS = 'SAVINGS',
+  DIVIDEND = 'DIVIDEND',
+}
+
+export enum BidStatus {
+  PENDING = 'PENDING',
+  WINNING = 'WINNING',
+  REJECTED = 'REJECTED',
 }
 
 export enum TontineType {

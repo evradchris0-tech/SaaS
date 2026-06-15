@@ -33,6 +33,7 @@ import { ContributionService } from './services/contribution.service';
 import { PayoutService } from './services/payout.service';
 import { RoundLifecycleService } from './services/round-lifecycle.service';
 import { TontinesService } from './tontines.service';
+import { BidService } from './services/bid.service';
 
 @ApiTags('Tontines')
 @ApiBearerAuth()
@@ -44,6 +45,7 @@ export class TontinesController {
     private readonly contributionService: ContributionService,
     private readonly payoutService: PayoutService,
     private readonly roundLifecycleService: RoundLifecycleService,
+    private readonly bidService: BidService,
   ) {}
 
   @Post()
@@ -285,6 +287,60 @@ export class TontinesController {
   ) {
     await this.roundLifecycleService.closeCycle(id, roundId, user.userId);
     return { message: 'Cycle clôturé avec succès' };
+  }
+
+  @Post(':id/rounds/:roundId/resolve')
+  @ApiOperation({
+    summary: 'Résoudre un cycle (COLLECTING -> READY) (Président)',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'roundId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Cycle résolu' })
+  async resolveRound(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('roundId', ParseUUIDPipe) roundId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.roundLifecycleService.resolveRound(id, roundId, user.userId);
+    return { message: 'Cycle résolu avec succès' };
+  }
+
+  @Post(':id/rounds/:roundId/bids')
+  @ApiOperation({ summary: 'Placer ou mettre à jour une enchère' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'roundId', format: 'uuid' })
+  async placeBid(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('roundId', ParseUUIDPipe) roundId: string,
+    @Body('discountAmount') discountAmount: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const callerMembership = await this.tontinesService.assertMembershipRole(
+      id,
+      user.userId,
+    );
+    return this.bidService.placeBid({
+      tontineId: id,
+      roundId,
+      membershipId: callerMembership.id,
+      discountAmount,
+    });
+  }
+
+  @Get(':id/rounds/:roundId/bids')
+  @ApiOperation({ summary: "Récupérer les enchères d'un cycle" })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'roundId', format: 'uuid' })
+  async getBids(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('roundId', ParseUUIDPipe) roundId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const callerMembership = await this.tontinesService.assertMembershipRole(
+      id,
+      user.userId,
+    );
+    return this.bidService.getBids(id, roundId, callerMembership.id);
   }
 
   @Patch(':id')

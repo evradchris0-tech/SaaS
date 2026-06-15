@@ -66,4 +66,29 @@ export class E2eTestHelper {
       await this.dataSource.query(`TRUNCATE TABLE ${tableNames} CASCADE;`);
     }
   }
+
+  async createUser(email: string) {
+    const request = require('supertest');
+    const phone = '+33' + Math.floor(Math.random() * 1000000000).toString();
+    // Register
+    await request(this.app.getHttpServer()).post('/auth/register').send({
+      email,
+      password: 'Password123!',
+      fullName: 'Test User',
+      phone,
+    });
+
+    // Login
+    const loginRes = await request(this.app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        phone,
+        password: 'Password123!',
+      });
+
+    return {
+      user: { id: loginRes.body.user?.id },
+      token: loginRes.body.accessToken,
+    };
+  }
 }

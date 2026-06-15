@@ -3,6 +3,7 @@ import {
   RoundGenerationParams,
 } from './tontine-strategy.interface';
 import { Round } from '../round.entity';
+import { Membership } from '../membership.entity';
 import { RoundStatus } from '../../../common/enums';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import { RuleSet } from '../interfaces/rule-set.interface';
@@ -54,8 +55,56 @@ export class AuctionStrategy implements TontineStrategy {
     if (penaltyRule.type === 'FIXED') {
       return penaltyRule.value;
     } else if (penaltyRule.type === 'PERCENT') {
-      return (expectedAmount * penaltyRule.value) / 100;
+      return Math.round((expectedAmount * penaltyRule.value) / 100);
     }
     return 0;
+  }
+
+  async determineBeneficiary(
+    round: Round,
+    members: Membership[],
+    pastRounds: Round[],
+  ): Promise<{ membershipId: string; discountAmount: number } | null> {
+    const previousWinners = new Set(
+      pastRounds
+        .map((r) => r.beneficiaryMembershipId)
+        .filter((id) => id !== null),
+    );
+
+    const eligibleMembers = members.filter((m) => !previousWinners.has(m.id));
+
+    if (eligibleMembers.length === 0) {
+      return null;
+    }
+
+    if (round.bids && round.bids.length > 0) {
+      // Filtrer les bids des membres éligibles
+      const eligibleBids = round.bids.filter((b) =>
+        eligibleMembers.some((m) => m.id === b.membershipId),
+      );
+
+      if (eligibleBids.length > 0) {
+        // Trier par discountAmount DESC, puis par date createdAt ASC
+        eligibleBids.sort((a, b) => {
+          if (a.discountAmount !== b.discountAmount) {
+            return Number(b.discountAmount) - Number(a.discountAmount);
+          }
+          return a.createdAt.getTime() - b.createdAt.getTime();
+        });
+
+        const winningBid = eligibleBids[0];
+        return {
+          membershipId: winningBid.membershipId,
+          discountAmount: Number(winningBid.discountAmount),
+        };
+      }
+    }
+
+    // Fallback: Random draw among eligible members
+    const randomIndex = Math.floor(Math.random() * eligibleMembers.length);
+    return {
+      membershipId: eligibleMembers[randomIndex].id,
+      discountAmount: 0,
+    };
   }
 }

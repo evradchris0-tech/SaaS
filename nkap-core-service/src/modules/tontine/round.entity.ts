@@ -1,5 +1,6 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../common/base.entity';
+import { Bid } from './bid.entity';
 import { RoundStatus } from '../../common/enums';
 import { BigIntTransformer } from '../../common/transformers/column-numeric.transformer';
 
@@ -22,4 +23,7 @@ export class Round extends BaseEntity {
 
   @Column({ type: 'enum', enum: RoundStatus, default: RoundStatus.SCHEDULED })
   status: RoundStatus;
+
+  @OneToMany(() => Bid, (bid) => bid.round)
+  bids: Bid[];
 }

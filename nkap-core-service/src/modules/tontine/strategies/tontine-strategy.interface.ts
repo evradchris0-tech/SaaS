@@ -23,4 +23,14 @@ export interface TontineStrategy {
     daysLate: number,
     ruleSet: RuleSet,
   ): number;
+
+  /**
+   * Determines the beneficiary of a given round, and returns their membership ID,
+   * along with any discount applied (for auctions)
+   */
+  determineBeneficiary?(
+    round: Round,
+    members: Membership[],
+    pastRounds: Round[],
+  ): Promise<{ membershipId: string; discountAmount: number } | null>;
 }

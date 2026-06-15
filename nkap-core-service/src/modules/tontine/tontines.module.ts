@@ -16,9 +16,19 @@ import { PenaltyCronService } from './cron/penalty-cron.service';
 import { LedgerModule } from '../ledger/ledger.module';
 import { Contribution } from '../financial/contribution.entity';
 
+import { Bid } from './bid.entity';
+import { BidService } from './services/bid.service';
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tontine, Fund, Membership, Round, Contribution]),
+    TypeOrmModule.forFeature([
+      Tontine,
+      Fund,
+      Membership,
+      Round,
+      Contribution,
+      Bid,
+    ]),
     LedgerModule,
   ],
   controllers: [TontinesController],
@@ -31,6 +41,7 @@ import { Contribution } from '../financial/contribution.entity';
     PenaltyService,
     RoundLifecycleService,
     PenaltyCronService,
+    BidService,
   ],
 })
 export class TontinesModule {}

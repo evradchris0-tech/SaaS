@@ -12,6 +12,7 @@ import {
   TontineStatus,
 } from '../../../common/enums';
 import { LedgerTransaction } from '../../ledger/ledger-transaction.entity';
+import { Bid } from '../bid.entity';
 
 @Injectable()
 export class PayoutService {
@@ -70,9 +71,66 @@ export class PayoutService {
         );
       }
 
-      const amountToPayout = round.expectedAmount;
+      let amountToPayout = Number(round.expectedAmount);
+      let discountAmount = 0;
 
-      if (Number(fund.cachedBalance) < Number(amountToPayout)) {
+      if (tontine.type === 'AUCTION') {
+        const winningBid = await queryRunner.manager.findOne(Bid, {
+          where: { roundId: round.id, status: 'WINNING' as any },
+        });
+
+        if (winningBid) {
+          discountAmount = Number(winningBid.discountAmount);
+          amountToPayout = amountToPayout - discountAmount;
+
+          const dividendFund = await queryRunner.manager.findOne(Fund, {
+            where: { tontineId: params.tontineId, type: FundType.DIVIDEND },
+            lock: { mode: 'pessimistic_write' },
+          });
+
+          if (!dividendFund) {
+            throw new BadRequestException('Caisse DIVIDEND introuvable.');
+          }
+
+          // Accrual de l'escompte
+          await this.ledgerService.recordTransaction(
+            {
+              tontineId: params.tontineId,
+              roundId: round.id,
+              membershipId: round.beneficiaryMembershipId,
+              type: TransactionType.FEE, // Ou un type spécifique, FEE est OK pour l'escompte
+              amount: discountAmount,
+              reference: `Escompte enchère du cycle ${round.index}`,
+              description: `Accrual du discount pour la caisse dividendes`,
+              fundId: fund.id,
+              entryType: EntryType.DEBIT, // Sortie du main
+              idempotencyKey: `DISCOUNT-DEBIT-${round.id}-${Date.now()}`,
+            },
+            queryRunner,
+          );
+
+          await this.ledgerService.recordTransaction(
+            {
+              tontineId: params.tontineId,
+              roundId: round.id,
+              membershipId: round.beneficiaryMembershipId,
+              type: TransactionType.FEE,
+              amount: discountAmount,
+              reference: `Escompte enchère du cycle ${round.index}`,
+              description: `Accrual du discount reçu`,
+              fundId: dividendFund.id,
+              entryType: EntryType.CREDIT, // Entrée dans dividend
+              idempotencyKey: `DISCOUNT-CREDIT-${round.id}-${Date.now()}`,
+            },
+            queryRunner,
+          );
+        }
+      }
+
+      if (
+        Number(fund.cachedBalance) <
+        Number(amountToPayout) + discountAmount
+      ) {
         throw new BadRequestException(
           'Fonds insuffisants dans la Caisse MAIN pour effectuer le décaissement.',
         );
