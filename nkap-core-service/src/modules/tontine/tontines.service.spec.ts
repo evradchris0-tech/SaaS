@@ -274,4 +274,71 @@ describe('TontinesService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
+
+  describe('Reads', () => {
+    it('findAllForUser lists tontines', async () => {
+      const mockMembershipRepo = {
+        find: jest.fn().mockResolvedValue([{ tontineId: 't1' }]),
+      };
+      const mockTontineRepo = {
+        find: jest.fn().mockResolvedValue([{ id: 't1' }]),
+      };
+      const dataSource = {
+        getRepository: jest.fn((entity) =>
+          entity === Membership ? mockMembershipRepo : mockTontineRepo,
+        ),
+      } as unknown as DataSource;
+      const service = new TontinesService(dataSource, makeRoundGen());
+      const res = await service.findAllForUser('u1');
+      expect(res).toHaveLength(1);
+    });
+  });
+
+  describe('updateRules', () => {
+    it('refuses if not DRAFT', async () => {
+      const service = new TontinesService({} as any, makeRoundGen());
+      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'findOneScoped')
+        .mockResolvedValue({ status: TontineStatus.ACTIVE } as any);
+      await expect(service.updateRules('t1', 'u1', {})).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+  });
+
+  describe('removeMember', () => {
+    it('refuses auto-exclusion of president', async () => {
+      const service = new TontinesService({} as any, makeRoundGen());
+      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'findOneScoped')
+        .mockResolvedValue({ status: TontineStatus.DRAFT } as any);
+      const mockMembershipRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: 'm1', userId: 'u1' }),
+      };
+      (service as any).dataSource = { getRepository: () => mockMembershipRepo };
+      await expect(
+        service.removeMember('t1', 'm1', 'u1'),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('cancelTontine', () => {
+    it('cancels a DRAFT tontine to CANCELLED', async () => {
+      const saveSpy = jest.fn();
+      const mockTontineRepo = { save: saveSpy };
+      const service = new TontinesService({} as any, makeRoundGen());
+      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'findOneScoped')
+        .mockResolvedValue({ id: 't1', status: TontineStatus.DRAFT } as any);
+      (service as any).dataSource = { getRepository: () => mockTontineRepo };
+
+      await service.cancelTontine('t1', 'u1');
+      expect(saveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: TontineStatus.CANCELLED }),
+      );
+    });
+  });
 });

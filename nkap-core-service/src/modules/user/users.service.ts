@@ -46,8 +46,7 @@ export class UsersService {
       throw new BadRequestException("L'ancien mot de passe est incorrect");
     }
 
-    const salt = await bcrypt.genSalt();
-    user.passwordHash = await bcrypt.hash(dto.newPassword, salt);
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
 
     await this.userRepository.save(user);
   }

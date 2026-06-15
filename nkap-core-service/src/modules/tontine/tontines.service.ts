@@ -299,7 +299,7 @@ export class TontinesService {
       // Pour annuler une ACTIVE, il faudrait des règles métiers complexes de remboursement.
       throw new ConflictException("Impossible d'annuler une tontine active");
     }
-    tontine.status = TontineStatus.COMPLETED; // ou un statut CANCELLED si on l'ajoute plus tard
+    tontine.status = TontineStatus.CANCELLED;
     await this.dataSource.getRepository(Tontine).save(tontine);
   }
 }
