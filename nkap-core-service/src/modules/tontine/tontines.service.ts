@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { FundType, Role, TontineStatus } from '../../common/enums';
+import { FundType, Role, TontineStatus, RoundStatus } from '../../common/enums';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateTontineDto } from './dto/create-tontine.dto';
 import { Fund } from './fund.entity';
@@ -134,7 +134,7 @@ export class TontinesService {
     tontineId: string,
     userId: string,
     roles?: Role[],
-  ): Promise<void> {
+  ): Promise<Membership> {
     const membership = await this.dataSource
       .getRepository(Membership)
       .findOne({ where: { tontineId, userId } });
@@ -146,6 +146,7 @@ export class TontinesService {
         'Rôle insuffisant pour effectuer cette opération',
       );
     }
+    return membership;
   }
 
   /**
@@ -193,6 +194,9 @@ export class TontinesService {
         members,
         startDate,
       );
+      if (rounds.length > 0) {
+        rounds[0].status = RoundStatus.COLLECTING;
+      }
       await manager.save(Round, rounds);
 
       tontine.status = TontineStatus.ACTIVE;

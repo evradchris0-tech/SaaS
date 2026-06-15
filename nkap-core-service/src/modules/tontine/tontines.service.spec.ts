@@ -241,7 +241,7 @@ describe('TontinesService', () => {
           Role.PRESIDENT,
           Role.TREASURER,
         ]),
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual(expect.objectContaining({ role: Role.TREASURER }));
     });
 
     it('passe pour tout membre quand aucun rôle n’est exigé', async () => {
@@ -249,9 +249,9 @@ describe('TontinesService', () => {
         buildDataSource({ role: Role.MEMBER }),
         makeRoundGen(),
       );
-      await expect(
-        service.assertMembershipRole('t1', 'u1'),
-      ).resolves.toBeUndefined();
+      await expect(service.assertMembershipRole('t1', 'u1')).resolves.toEqual(
+        expect.objectContaining({ role: Role.MEMBER }),
+      );
     });
 
     it('refuse un non-membre (403)', async () => {

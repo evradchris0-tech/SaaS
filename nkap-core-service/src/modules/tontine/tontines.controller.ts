@@ -10,6 +10,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,7 @@ import { PayoutDto } from './dto/payout.dto';
 import { UpdateTontineRulesDto } from './dto/update-tontine-rules.dto';
 import { ContributionService } from './services/contribution.service';
 import { PayoutService } from './services/payout.service';
+import { RoundLifecycleService } from './services/round-lifecycle.service';
 import { TontinesService } from './tontines.service';
 
 @ApiTags('Tontines')
@@ -41,6 +43,7 @@ export class TontinesController {
     private readonly tontinesService: TontinesService,
     private readonly contributionService: ContributionService,
     private readonly payoutService: PayoutService,
+    private readonly roundLifecycleService: RoundLifecycleService,
   ) {}
 
   @Post()
@@ -136,7 +139,21 @@ export class TontinesController {
     @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    await this.tontinesService.assertMembershipRole(id, user.userId);
+    const callerMembership = await this.tontinesService.assertMembershipRole(
+      id,
+      user.userId,
+    );
+
+    if (
+      dto.membershipId !== callerMembership.id &&
+      callerMembership.role !== Role.PRESIDENT &&
+      callerMembership.role !== Role.TREASURER
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez pas cotiser au nom d’un autre membre',
+      );
+    }
+
     return this.contributionService.payContribution({
       tontineId: id,
       roundId: dto.roundId,
@@ -252,6 +269,22 @@ export class TontinesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.tontinesService.findRoundById(id, roundId, user.userId);
+  }
+
+  @Post(':id/rounds/:roundId/close')
+  @ApiOperation({
+    summary: 'Clôturer un cycle (PAID) et ouvrir le suivant (Président)',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'roundId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Cycle clôturé' })
+  async closeRound(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('roundId', ParseUUIDPipe) roundId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.roundLifecycleService.closeCycle(id, roundId, user.userId);
+    return { message: 'Cycle clôturé avec succès' };
   }
 
   @Patch(':id')

@@ -7,13 +7,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Round } from '../round.entity';
 import { Membership } from '../membership.entity';
+import { Tontine } from '../tontine.entity';
+import { Contribution } from '../../financial/contribution.entity';
 import { LedgerService } from '../../ledger/ledger.service';
 import { Fund } from '../fund.entity';
+import { LedgerTransaction } from '../../ledger/ledger-transaction.entity';
 import {
   TransactionType,
   EntryType,
   FundType,
   RoundStatus,
+  TontineStatus,
 } from '../../../common/enums';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,6 +36,9 @@ export class ContributionService {
     @InjectRepository(Round) private roundRepository: Repository<Round>,
     @InjectRepository(Membership)
     private membershipRepository: Repository<Membership>,
+    @InjectRepository(Tontine) private tontineRepository: Repository<Tontine>,
+    @InjectRepository(Contribution)
+    private contributionRepository: Repository<Contribution>,
     @InjectRepository(Fund) private fundRepository: Repository<Fund>,
     private ledgerService: LedgerService,
   ) {}
@@ -57,6 +64,46 @@ export class ContributionService {
     });
     if (!membership) {
       throw new NotFoundException('Membership not found');
+    }
+
+    const tontine = await this.tontineRepository.findOne({
+      where: { id: dto.tontineId },
+    });
+    if (!tontine) {
+      throw new NotFoundException('Tontine not found');
+    }
+    if (tontine.status !== TontineStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Tontine must be ACTIVE to accept contributions',
+      );
+    }
+
+    const result = await this.ledgerService['dataSource']
+      .getRepository(LedgerTransaction)
+      .createQueryBuilder('tx')
+      .select('SUM(tx.amount)', 'totalPaid')
+      .where('tx.tontineId = :tontineId', { tontineId: dto.tontineId })
+      .andWhere('tx.roundId = :roundId', { roundId: dto.roundId })
+      .andWhere('tx.membershipId = :membershipId', {
+        membershipId: dto.membershipId,
+      })
+      .andWhere('tx.type = :type', { type: TransactionType.CONTRIBUTION })
+      .getRawOne();
+
+    const totalPaid = Number(result?.totalPaid || 0);
+    const expectedForMember =
+      tontine.ruleSet.contribution.amountPerShare * membership.shares;
+    const dueAmount = expectedForMember - totalPaid;
+
+    if (dueAmount <= 0) {
+      throw new BadRequestException(
+        'Contribution for this round is already fully paid',
+      );
+    }
+    if (Number(dto.amount) !== dueAmount) {
+      throw new BadRequestException(
+        `Amount must be exactly the remaining due amount: ${dueAmount}`,
+      );
     }
 
     const mainFund = await this.fundRepository.findOne({
