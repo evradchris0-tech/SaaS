@@ -13,9 +13,24 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/user/users.module';
+import { LoggerModule } from 'nestjs-pino';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Observabilité : logs structurés (JSON) + corrélation de requête + redaction
+    // des secrets. Pretty en dev, JSON en test/prod (pas de dépendance runtime).
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level:
+          process.env.LOG_LEVEL ??
+          (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+        redact: ['req.headers.authorization', 'req.headers.cookie'],
+        transport:
+          process.env.NODE_ENV === 'development'
+            ? { target: 'pino-pretty', options: { singleLine: true } }
+            : undefined,
+      },
+    }),
     ScheduleModule.forRoot(),
     // Anti-abus : plafond global par IP (60 s). Les routes sensibles
     // (cf. /auth) resserrent cette limite via @Throttle.
