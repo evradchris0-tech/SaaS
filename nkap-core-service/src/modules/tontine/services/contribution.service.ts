@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Round } from '../round.entity';
 import { Membership } from '../membership.entity';
 import { Tontine } from '../tontine.entity';
@@ -41,6 +41,7 @@ export class ContributionService {
     private contributionRepository: Repository<Contribution>,
     @InjectRepository(Fund) private fundRepository: Repository<Fund>,
     private ledgerService: LedgerService,
+    private dataSource: DataSource,
   ) {}
 
   async payContribution(dto: PayContributionDto) {
@@ -78,7 +79,7 @@ export class ContributionService {
       );
     }
 
-    const result = await this.ledgerService['dataSource']
+    const result = await this.dataSource
       .getRepository(LedgerTransaction)
       .createQueryBuilder('tx')
       .select('SUM(tx.amount)', 'totalPaid')
@@ -88,7 +89,7 @@ export class ContributionService {
         membershipId: dto.membershipId,
       })
       .andWhere('tx.type = :type', { type: TransactionType.CONTRIBUTION })
-      .getRawOne();
+      .getRawOne<{ totalPaid: string | null }>();
 
     const totalPaid = Number(result?.totalPaid || 0);
     const expectedForMember =
