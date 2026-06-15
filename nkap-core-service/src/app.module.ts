@@ -10,6 +10,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { OrganizationsModule } from './modules/organization/organizations.module';
 import { TontinesModule } from './modules/tontine/tontines.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { LedgerModule } from './modules/ledger/ledger.module';
     OrganizationsModule,
     TontinesModule,
     LedgerModule,
+    FinanceModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

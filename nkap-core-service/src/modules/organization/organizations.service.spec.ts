@@ -157,4 +157,106 @@ describe('OrganizationsService', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('lecture & gestion', () => {
+    it('listForUser retourne les orgs dont l’utilisateur est membre', async () => {
+      const memRepo = {
+        find: jest.fn(async () => [
+          { organizationId: 'o1' },
+          { organizationId: 'o2' },
+        ]),
+      };
+      const orgRepo = {
+        find: jest.fn(async () => [{ id: 'o1' }, { id: 'o2' }]),
+      };
+      const ds = {
+        getRepository: jest.fn((e: unknown) =>
+          e === Organization ? orgRepo : memRepo,
+        ),
+      } as unknown as DataSource;
+      const service = new OrganizationsService(ds);
+
+      const res = await service.listForUser('u1');
+      expect(res).toHaveLength(2);
+    });
+
+    it('update renomme l’organisation (OWNER)', async () => {
+      const memRepo = {
+        findOne: jest.fn(async () => ({ role: OrgRole.OWNER })),
+      };
+      const orgRepo = {
+        findOne: jest.fn(async () => ({ id: 'o1', name: 'old' })),
+        save: jest.fn(async (o: unknown) => o),
+      };
+      const ds = {
+        getRepository: jest.fn((e: unknown) =>
+          e === Organization ? orgRepo : memRepo,
+        ),
+      } as unknown as DataSource;
+      const service = new OrganizationsService(ds);
+
+      const res: any = await service.update('o1', { name: 'new' }, 'owner');
+      expect(res.name).toBe('new');
+    });
+
+    it('updateMemberRole refuse de rétrograder le dernier OWNER (409)', async () => {
+      const memRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce({ role: OrgRole.OWNER })
+          .mockResolvedValueOnce({ role: OrgRole.OWNER }),
+        count: jest.fn(async () => 1),
+        save: jest.fn(),
+      };
+      const ds = {
+        getRepository: jest.fn(() => memRepo),
+      } as unknown as DataSource;
+      const service = new OrganizationsService(ds);
+
+      await expect(
+        service.updateMemberRole(
+          'o1',
+          'target',
+          { role: OrgRole.MEMBER },
+          'owner',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('removeMember retire un membre quand le demandeur est ADMIN', async () => {
+      const memRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce({ role: OrgRole.ADMIN })
+          .mockResolvedValueOnce({ role: OrgRole.MEMBER, id: 'm1' }),
+        softRemove: jest.fn(async () => undefined),
+      };
+      const ds = {
+        getRepository: jest.fn(() => memRepo),
+      } as unknown as DataSource;
+      const service = new OrganizationsService(ds);
+
+      await service.removeMember('o1', 'target', 'admin');
+      expect(memRepo.softRemove).toHaveBeenCalled();
+    });
+
+    it('removeMember refuse de retirer le dernier OWNER (409)', async () => {
+      const memRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce({ role: OrgRole.OWNER })
+          .mockResolvedValueOnce({ role: OrgRole.OWNER, id: 'm1' }),
+        count: jest.fn(async () => 1),
+        softRemove: jest.fn(),
+      };
+      const ds = {
+        getRepository: jest.fn(() => memRepo),
+      } as unknown as DataSource;
+      const service = new OrganizationsService(ds);
+
+      await expect(
+        service.removeMember('o1', 'target', 'owner'),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
 });
