@@ -176,7 +176,7 @@ describe('OrganizationsService', () => {
       } as unknown as DataSource;
       const service = new OrganizationsService(ds);
 
-      const res = await service.listForUser('u1');
+      const res = await service.listForUser('u1', { limit: 20, offset: 0 });
       expect(res).toHaveLength(2);
     });
 
