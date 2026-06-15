@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { OrgRole } from '../../common/enums';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AddOrgMemberDto } from './dto/add-org-member.dto';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -96,8 +97,11 @@ export class OrganizationsService {
     }
   }
 
-  /** Liste les organisations dont l'utilisateur est membre (scoping multi-tenant). */
-  async listForUser(userId: string): Promise<Organization[]> {
+  /** Liste les organisations dont l'utilisateur est membre (scoping multi-tenant, paginé). */
+  async listForUser(
+    userId: string,
+    pagination: PaginationQueryDto,
+  ): Promise<Organization[]> {
     const memberships = await this.dataSource
       .getRepository(OrganizationMembership)
       .find({ where: { userId } });
@@ -105,9 +109,12 @@ export class OrganizationsService {
       return [];
     }
     const orgIds = memberships.map((m) => m.organizationId);
-    return this.dataSource
-      .getRepository(Organization)
-      .find({ where: { id: In(orgIds) } });
+    return this.dataSource.getRepository(Organization).find({
+      where: { id: In(orgIds) },
+      order: { createdAt: 'DESC' },
+      take: pagination.limit,
+      skip: pagination.offset,
+    });
   }
 
   /** Détail d'une organisation (réservé à ses membres). */
@@ -122,15 +129,19 @@ export class OrganizationsService {
     return org;
   }
 
-  /** Liste les membres d'une organisation (réservé à ses membres). */
+  /** Liste les membres d'une organisation (réservé à ses membres, paginé). */
   async listMembers(
     organizationId: string,
     userId: string,
+    pagination: PaginationQueryDto,
   ): Promise<OrganizationMembership[]> {
     await this.assertOrgRole(organizationId, userId);
-    return this.dataSource
-      .getRepository(OrganizationMembership)
-      .find({ where: { organizationId } });
+    return this.dataSource.getRepository(OrganizationMembership).find({
+      where: { organizationId },
+      order: { createdAt: 'ASC' },
+      take: pagination.limit,
+      skip: pagination.offset,
+    });
   }
 
   /** Met à jour une organisation (OWNER/ADMIN). */

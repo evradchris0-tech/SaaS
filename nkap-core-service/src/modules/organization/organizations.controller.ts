@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -24,6 +25,7 @@ import { AddOrgMemberDto } from './dto/add-org-member.dto';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateOrgMemberRoleDto } from './dto/update-org-member-role.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { OrganizationsService } from './organizations.service';
 
 @ApiTags('Organizations')
@@ -47,8 +49,8 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Lister les organisations dont je suis membre' })
   @ApiResponse({ status: 200, description: 'Liste des organisations' })
   @ApiResponse({ status: 401, description: 'Non autorisé' })
-  list(@CurrentUser() user: AuthUser) {
-    return this.organizationsService.listForUser(user.userId);
+  list(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.organizationsService.listForUser(user.userId, pagination);
   }
 
   @Get(':id')
@@ -78,8 +80,9 @@ export class OrganizationsController {
   listMembers(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
+    @Query() pagination: PaginationQueryDto,
   ) {
-    return this.organizationsService.listMembers(id, user.userId);
+    return this.organizationsService.listMembers(id, user.userId, pagination);
   }
 
   @Patch(':id')
