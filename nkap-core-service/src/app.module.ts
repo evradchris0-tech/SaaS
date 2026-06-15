@@ -12,7 +12,7 @@ import { TontinesModule } from './modules/tontine/tontines.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
-
+import { UsersModule } from './modules/user/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -38,6 +38,7 @@ import { HealthModule } from './modules/health/health.module';
       }),
     }),
     AuthModule,
+    UsersModule,
     OrganizationsModule,
     TontinesModule,
     LedgerModule,

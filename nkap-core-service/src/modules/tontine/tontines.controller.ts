@@ -5,6 +5,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Get,
+  Patch,
+  Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,6 +27,7 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { ContributeDto } from './dto/contribute.dto';
 import { CreateTontineDto } from './dto/create-tontine.dto';
 import { PayoutDto } from './dto/payout.dto';
+import { UpdateTontineRulesDto } from './dto/update-tontine-rules.dto';
 import { ContributionService } from './services/contribution.service';
 import { PayoutService } from './services/payout.service';
 import { TontinesService } from './tontines.service';
@@ -183,5 +188,109 @@ export class TontinesController {
       roundId: dto.roundId,
       idempotencyKey,
     });
+  }
+
+  // --- NEW ENDPOINTS ---
+
+  @Get()
+  @ApiOperation({ summary: 'Lister les tontines auxquelles on appartient' })
+  @ApiResponse({ status: 200, description: 'Liste des tontines' })
+  async findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.tontinesService.findAllForUser(
+      user.userId,
+      limit || 10,
+      offset || 0,
+    );
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: "Détail d'une tontine" })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Détails de la tontine' })
+  @ApiResponse({ status: 403, description: 'Non membre' })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.findOneScoped(id, user.userId);
+  }
+
+  @Get(':id/members')
+  @ApiOperation({ summary: "Lister les membres d'une tontine" })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Liste des membres' })
+  async getMembers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.findMembers(id, user.userId);
+  }
+
+  @Get(':id/rounds')
+  @ApiOperation({ summary: 'Lister le calendrier (Rounds) de la tontine' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Liste des rounds' })
+  async getRounds(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.findRounds(id, user.userId);
+  }
+
+  @Get(':id/rounds/:roundId')
+  @ApiOperation({ summary: "Détail d'un round spécifique" })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'roundId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Détail du round' })
+  async getRoundById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('roundId', ParseUUIDPipe) roundId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.findRoundById(id, roundId, user.userId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: "Modifier les règles d'une tontine (DRAFT, Président)",
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Règles modifiées' })
+  async updateRules(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTontineRulesDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.tontinesService.updateRules(id, user.userId, dto.ruleSet);
+  }
+
+  @Delete(':id/members/:membershipId')
+  @ApiOperation({ summary: 'Exclure un membre (DRAFT, Président)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'membershipId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Membre exclu' })
+  async removeMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.tontinesService.removeMember(id, membershipId, user.userId);
+    return { message: 'Membre retiré avec succès' };
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Annuler une tontine en DRAFT (Président)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Tontine annulée' })
+  async cancelTontine(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.tontinesService.cancelTontine(id, user.userId);
+    return { message: 'Tontine annulée avec succès' };
   }
 }
