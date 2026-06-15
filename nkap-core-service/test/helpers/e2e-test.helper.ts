@@ -6,6 +6,7 @@ dotenv.config({ path: resolve(__dirname, '../../.env.test') });
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 
@@ -17,7 +18,13 @@ export class E2eTestHelper {
   async initApp(): Promise<INestApplication> {
     this.moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // En e2e on neutralise le rate-limiting : les suites enchaînent beaucoup
+      // de requêtes (auth, setup) et prendraient des 429 parasites. Le throttler
+      // reste actif en prod (testé via sa config).
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     this.app = this.moduleFixture.createNestApplication();
 
