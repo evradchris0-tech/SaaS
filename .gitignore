@@ -11,6 +11,11 @@
 **/.env
 !**/.env.example
 
+# Canal de communication des agents (vif, non versionné pour éviter le bruit
+# git et les collisions de worktree). Les snapshots figés sont committés sous
+# docs/SYNC.archive-*.md à la demande.
+docs/SYNC.md
+
 # Logs / OS / IDE
 *.log
 .DS_Store
