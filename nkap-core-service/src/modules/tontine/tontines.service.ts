@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { FundType, Role, TontineStatus } from '../../common/enums';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateTontineDto } from './dto/create-tontine.dto';
@@ -198,5 +198,108 @@ export class TontinesService {
       tontine.status = TontineStatus.ACTIVE;
       return manager.save(tontine);
     });
+  }
+
+  // --- NEW METHODS FOR FULL API COVERAGE ---
+
+  async findAllForUser(userId: string, limit = 10, offset = 0) {
+    // Liste paginée des tontines auxquelles l'utilisateur appartient
+    const memberships = await this.dataSource.getRepository(Membership).find({
+      where: { userId },
+      skip: offset,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+
+    if (memberships.length === 0) return [];
+
+    const tontineIds = memberships.map((m) => m.tontineId);
+    return this.dataSource.getRepository(Tontine).find({
+      where: { id: In(tontineIds) },
+    });
+  }
+
+  async findOneScoped(tontineId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId); // Vérifie appartenance
+    const tontine = await this.dataSource.getRepository(Tontine).findOne({
+      where: { id: tontineId },
+    });
+    if (!tontine) throw new NotFoundException('Tontine introuvable');
+    return tontine;
+  }
+
+  async findMembers(tontineId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId);
+    return this.dataSource.getRepository(Membership).find({
+      where: { tontineId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async findRounds(tontineId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId);
+    return this.dataSource.getRepository(Round).find({
+      where: { tontineId },
+      order: { index: 'ASC' },
+    });
+  }
+
+  async findRoundById(tontineId: string, roundId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId);
+    const round = await this.dataSource.getRepository(Round).findOne({
+      where: { id: roundId, tontineId },
+    });
+    if (!round) throw new NotFoundException('Tour introuvable');
+    return round;
+  }
+
+  async updateRules(
+    tontineId: string,
+    userId: string,
+
+    ruleSet: any,
+  ) {
+    await this.assertMembershipRole(tontineId, userId, [Role.PRESIDENT]);
+    const tontine = await this.findOneScoped(tontineId, userId);
+    if (tontine.status !== TontineStatus.DRAFT) {
+      throw new ConflictException(
+        "Impossible de modifier les règles : la tontine n'est plus en DRAFT",
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    tontine.ruleSet = ruleSet;
+    return this.dataSource.getRepository(Tontine).save(tontine);
+  }
+
+  async removeMember(tontineId: string, membershipId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId, [Role.PRESIDENT]);
+    const tontine = await this.findOneScoped(tontineId, userId);
+    if (tontine.status !== TontineStatus.DRAFT) {
+      throw new ConflictException(
+        "Impossible d'exclure un membre : la tontine n'est plus en DRAFT",
+      );
+    }
+    const membershipRepo = this.dataSource.getRepository(Membership);
+    const target = await membershipRepo.findOne({
+      where: { id: membershipId, tontineId },
+    });
+    if (!target) throw new NotFoundException('Membre introuvable');
+    if (target.userId === userId) {
+      throw new ConflictException(
+        "Le président ne peut pas s'exclure lui-même",
+      );
+    }
+    await membershipRepo.softRemove(target);
+  }
+
+  async cancelTontine(tontineId: string, userId: string) {
+    await this.assertMembershipRole(tontineId, userId, [Role.PRESIDENT]);
+    const tontine = await this.findOneScoped(tontineId, userId);
+    if (tontine.status !== TontineStatus.DRAFT) {
+      // Pour annuler une ACTIVE, il faudrait des règles métiers complexes de remboursement.
+      throw new ConflictException("Impossible d'annuler une tontine active");
+    }
+    tontine.status = TontineStatus.CANCELLED;
+    await this.dataSource.getRepository(Tontine).save(tontine);
   }
 }
