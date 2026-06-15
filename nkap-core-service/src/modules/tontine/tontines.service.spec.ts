@@ -241,7 +241,7 @@ describe('TontinesService', () => {
           Role.PRESIDENT,
           Role.TREASURER,
         ]),
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual(expect.objectContaining({ role: Role.TREASURER }));
     });
 
     it('passe pour tout membre quand aucun rôle n’est exigé', async () => {
@@ -249,9 +249,9 @@ describe('TontinesService', () => {
         buildDataSource({ role: Role.MEMBER }),
         makeRoundGen(),
       );
-      await expect(
-        service.assertMembershipRole('t1', 'u1'),
-      ).resolves.toBeUndefined();
+      await expect(service.assertMembershipRole('t1', 'u1')).resolves.toEqual(
+        expect.objectContaining({ role: Role.MEMBER }),
+      );
     });
 
     it('refuse un non-membre (403)', async () => {
@@ -297,7 +297,9 @@ describe('TontinesService', () => {
   describe('updateRules', () => {
     it('refuses if not DRAFT', async () => {
       const service = new TontinesService({} as any, makeRoundGen());
-      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'assertMembershipRole')
+        .mockResolvedValue({ id: 'm', role: Role.PRESIDENT } as any);
       jest
         .spyOn(service, 'findOneScoped')
         .mockResolvedValue({ status: TontineStatus.ACTIVE } as any);
@@ -310,7 +312,9 @@ describe('TontinesService', () => {
   describe('removeMember', () => {
     it('refuses auto-exclusion of president', async () => {
       const service = new TontinesService({} as any, makeRoundGen());
-      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'assertMembershipRole')
+        .mockResolvedValue({ id: 'm', role: Role.PRESIDENT } as any);
       jest
         .spyOn(service, 'findOneScoped')
         .mockResolvedValue({ status: TontineStatus.DRAFT } as any);
@@ -329,7 +333,9 @@ describe('TontinesService', () => {
       const saveSpy = jest.fn();
       const mockTontineRepo = { save: saveSpy };
       const service = new TontinesService({} as any, makeRoundGen());
-      jest.spyOn(service, 'assertMembershipRole').mockResolvedValue();
+      jest
+        .spyOn(service, 'assertMembershipRole')
+        .mockResolvedValue({ id: 'm', role: Role.PRESIDENT } as any);
       jest
         .spyOn(service, 'findOneScoped')
         .mockResolvedValue({ id: 't1', status: TontineStatus.DRAFT } as any);

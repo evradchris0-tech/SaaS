@@ -11,12 +11,14 @@ import { TontineStrategyFactory } from './strategies/tontine-strategy.factory';
 import { ContributionService } from './services/contribution.service';
 import { PayoutService } from './services/payout.service';
 import { PenaltyService } from './services/penalty.service';
+import { RoundLifecycleService } from './services/round-lifecycle.service';
 import { PenaltyCronService } from './cron/penalty-cron.service';
 import { LedgerModule } from '../ledger/ledger.module';
+import { Contribution } from '../financial/contribution.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tontine, Fund, Membership, Round]),
+    TypeOrmModule.forFeature([Tontine, Fund, Membership, Round, Contribution]),
     LedgerModule,
   ],
   controllers: [TontinesController],
@@ -27,6 +29,7 @@ import { LedgerModule } from '../ledger/ledger.module';
     ContributionService,
     PayoutService,
     PenaltyService,
+    RoundLifecycleService,
     PenaltyCronService,
   ],
 })
