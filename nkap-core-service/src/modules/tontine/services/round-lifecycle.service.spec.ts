@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RoundLifecycleService } from './round-lifecycle.service';
 import { TontinesService } from '../tontines.service';
+import { LedgerService } from '../../ledger/ledger.service';
 import { DataSource } from 'typeorm';
 import { RoundStatus, TontineStatus, Role } from '../../../common/enums';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { Tontine } from '../tontine.entity';
 describe('RoundLifecycleService', () => {
   let service: RoundLifecycleService;
   let tontinesService: Partial<TontinesService>;
+  let ledgerService: Partial<LedgerService>;
   let manager: any;
   let queryRunner: any;
 
@@ -18,6 +20,10 @@ describe('RoundLifecycleService', () => {
       assertMembershipRole: jest
         .fn()
         .mockResolvedValue({ id: 'm1', role: Role.PRESIDENT }),
+    };
+
+    ledgerService = {
+      recordTransaction: jest.fn(),
     };
 
     manager = {
@@ -42,6 +48,7 @@ describe('RoundLifecycleService', () => {
       providers: [
         RoundLifecycleService,
         { provide: TontinesService, useValue: tontinesService },
+        { provide: LedgerService, useValue: ledgerService },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();

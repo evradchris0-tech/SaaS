@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
+import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 
 export class E2eTestHelper {
@@ -68,7 +69,6 @@ export class E2eTestHelper {
   }
 
   async createUser(email: string) {
-    const request = require('supertest');
     const phone = '+33' + Math.floor(Math.random() * 1000000000).toString();
     // Register
     await request(this.app.getHttpServer()).post('/auth/register').send({

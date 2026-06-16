@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { Round } from '../round.entity';
 import { Tontine } from '../tontine.entity';
 import { LedgerService } from '../../ledger/ledger.service';
@@ -14,10 +14,13 @@ import {
   FundType,
   TransactionType,
   EntryType,
+  TontineType,
+  BidStatus,
 } from '../../../common/enums';
 import { TontinesService } from '../tontines.service';
 import { Membership } from '../membership.entity';
 import { Fund } from '../fund.entity';
+import { Bid } from '../bid.entity';
 import { AuctionStrategy } from '../strategies/auction.strategy';
 
 @Injectable()
@@ -82,45 +85,9 @@ export class RoundLifecycleService {
         nextRound.status = RoundStatus.COLLECTING;
         await queryRunner.manager.save(Round, nextRound);
       } else {
-        // C'était le dernier round, distribution des dividendes si AUCTION
-        if (tontine.type === 'AUCTION') {
-          const dividendFund = await queryRunner.manager.findOne(Fund, {
-            where: { tontineId, type: FundType.DIVIDEND },
-            lock: { mode: 'pessimistic_write' },
-          });
-
-          if (dividendFund && Number(dividendFund.cachedBalance) > 0) {
-            const members = await queryRunner.manager.find(Membership, {
-              where: { tontineId, status: 'ACTIVE' },
-            });
-
-            if (members.length > 0) {
-              const dividendPerMember = Math.floor(
-                Number(dividendFund.cachedBalance) / members.length,
-              );
-
-              if (dividendPerMember > 0) {
-                // Pour chaque membre, on enregistre un DEBIT sur DIVIDEND (PAYOUT)
-                for (const member of members) {
-                  await this.ledgerService.recordTransaction(
-                    {
-                      tontineId,
-                      roundId: round.id,
-                      membershipId: member.id,
-                      type: TransactionType.PAYOUT,
-                      amount: dividendPerMember,
-                      reference: 'Dividendes fin de cycle',
-                      description: 'Distribution des dividendes des enchères',
-                      fundId: dividendFund.id,
-                      entryType: EntryType.DEBIT,
-                      idempotencyKey: `DIVIDEND-PAYOUT-${member.id}-${round.id}`,
-                    },
-                    queryRunner,
-                  );
-                }
-              }
-            }
-          }
+        // C'était le dernier round : distribution des dividendes si AUCTION.
+        if (tontine.type === TontineType.AUCTION) {
+          await this.distributeDividends(queryRunner, tontineId, round.id);
         }
         tontine.status = TontineStatus.COMPLETED;
         await queryRunner.manager.save(Tontine, tontine);
@@ -132,6 +99,65 @@ export class RoundLifecycleService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Répartit, en fin de tontine, le solde de la caisse DIVIDEND à parts égales
+   * entre les membres actifs. Le reliquat de la division entière (solde mod
+   * nbMembres) est distribué une unité à la fois aux premiers membres (ordre
+   * déterministe par id) : la caisse DIVIDEND est ainsi vidée à EXACTEMENT 0,
+   * sans valeur orpheline. Idempotent (clé par membre + round).
+   */
+  private async distributeDividends(
+    queryRunner: QueryRunner,
+    tontineId: string,
+    roundId: string,
+  ): Promise<void> {
+    const dividendFund = await queryRunner.manager.findOne(Fund, {
+      where: { tontineId, type: FundType.DIVIDEND },
+      lock: { mode: 'pessimistic_write' },
+    });
+    const totalDividend = dividendFund ? Number(dividendFund.cachedBalance) : 0;
+    if (!dividendFund || totalDividend <= 0) {
+      return;
+    }
+
+    const members = await queryRunner.manager.find(Membership, {
+      where: { tontineId, status: 'ACTIVE' },
+    });
+    if (members.length === 0) {
+      return;
+    }
+
+    const base = Math.floor(totalDividend / members.length);
+    let remainder = totalDividend - base * members.length;
+
+    // Ordre déterministe pour l'attribution reproductible du reliquat.
+    const ordered = [...members].sort((a, b) => a.id.localeCompare(b.id));
+    for (const member of ordered) {
+      const amount = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) {
+        remainder -= 1;
+      }
+      if (amount <= 0) {
+        continue;
+      }
+      await this.ledgerService.recordTransaction(
+        {
+          tontineId,
+          roundId,
+          membershipId: member.id,
+          type: TransactionType.PAYOUT,
+          amount,
+          reference: 'Dividendes fin de cycle',
+          description: 'Distribution des dividendes des enchères',
+          fundId: dividendFund.id,
+          entryType: EntryType.DEBIT,
+          idempotencyKey: `DIVIDEND-PAYOUT-${member.id}-${roundId}`,
+        },
+        queryRunner,
+      );
     }
   }
 
@@ -161,10 +187,12 @@ export class RoundLifecycleService {
         );
       }
 
+      // Postgres interdit `SELECT ... FOR UPDATE` sur le côté nullable d'un
+      // OUTER JOIN : on verrouille le round SANS jointure, puis on charge les
+      // enchères séparément (cf. relations: ['bids'] retiré).
       const round = await queryRunner.manager.findOne(Round, {
         where: { id: roundId, tontineId },
         lock: { mode: 'pessimistic_write' },
-        relations: ['bids'],
       });
 
       if (!round) {
@@ -180,8 +208,13 @@ export class RoundLifecycleService {
         );
       }
 
-      if (tontine.type === 'AUCTION') {
+      if (tontine.type === TontineType.AUCTION) {
         const strategy = new AuctionStrategy();
+
+        // Chargement des enchères hors verrou (cf. note ci-dessus).
+        round.bids = await queryRunner.manager.find(Bid, {
+          where: { roundId: round.id },
+        });
 
         const members = await queryRunner.manager.find(Membership, {
           where: { tontineId },
@@ -201,11 +234,10 @@ export class RoundLifecycleService {
 
           if (round.bids && round.bids.length > 0) {
             for (const bid of round.bids) {
-              if (bid.membershipId === winner.membershipId) {
-                bid.status = 'WINNING' as any;
-              } else {
-                bid.status = 'REJECTED' as any;
-              }
+              bid.status =
+                bid.membershipId === winner.membershipId
+                  ? BidStatus.WINNING
+                  : BidStatus.REJECTED;
               await queryRunner.manager.save(bid);
             }
           }

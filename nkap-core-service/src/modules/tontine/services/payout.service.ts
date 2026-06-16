@@ -10,6 +10,8 @@ import {
   FundType,
   EntryType,
   TontineStatus,
+  TontineType,
+  BidStatus,
 } from '../../../common/enums';
 import { LedgerTransaction } from '../../ledger/ledger-transaction.entity';
 import { Bid } from '../bid.entity';
@@ -74,9 +76,9 @@ export class PayoutService {
       let amountToPayout = Number(round.expectedAmount);
       let discountAmount = 0;
 
-      if (tontine.type === 'AUCTION') {
+      if (tontine.type === TontineType.AUCTION) {
         const winningBid = await queryRunner.manager.findOne(Bid, {
-          where: { roundId: round.id, status: 'WINNING' as any },
+          where: { roundId: round.id, status: BidStatus.WINNING },
         });
 
         if (winningBid) {
@@ -104,7 +106,7 @@ export class PayoutService {
               description: `Accrual du discount pour la caisse dividendes`,
               fundId: fund.id,
               entryType: EntryType.DEBIT, // Sortie du main
-              idempotencyKey: `DISCOUNT-DEBIT-${round.id}-${Date.now()}`,
+              idempotencyKey: `DISCOUNT-DEBIT-${round.id}`,
             },
             queryRunner,
           );
@@ -120,7 +122,7 @@ export class PayoutService {
               description: `Accrual du discount reçu`,
               fundId: dividendFund.id,
               entryType: EntryType.CREDIT, // Entrée dans dividend
-              idempotencyKey: `DISCOUNT-CREDIT-${round.id}-${Date.now()}`,
+              idempotencyKey: `DISCOUNT-CREDIT-${round.id}`,
             },
             queryRunner,
           );
@@ -136,8 +138,10 @@ export class PayoutService {
         );
       }
 
-      const idempotencyKey =
-        params.idempotencyKey || `PAYOUT-${round.id}-${Date.now()}`;
+      // Clé déterministe par round : un décaissement par cycle. En cas de
+      // double appel concurrent, le verrou pessimiste sur le round sérialise,
+      // et cette clé (unicité) bloque tout doublon résiduel.
+      const idempotencyKey = params.idempotencyKey || `PAYOUT-${round.id}`;
 
       const transaction = await this.ledgerService.recordTransaction(
         {

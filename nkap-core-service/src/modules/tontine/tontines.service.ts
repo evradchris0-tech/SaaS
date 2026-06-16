@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { FundType, Role, TontineStatus, RoundStatus } from '../../common/enums';
+import {
+  FundType,
+  Role,
+  TontineStatus,
+  RoundStatus,
+  TontineType,
+} from '../../common/enums';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateTontineDto } from './dto/create-tontine.dto';
 import { Fund } from './fund.entity';
@@ -57,7 +63,16 @@ export class TontinesService {
       });
       const saved = await manager.save(tontine);
 
-      const funds = DEFAULT_FUNDS.map((f) =>
+      // Les caisses par défaut + une caisse DIVIDEND dédiée aux tontines à
+      // enchères (y transitent les escomptes, redistribués en fin de cycle).
+      const fundDefs = [...DEFAULT_FUNDS];
+      if (dto.type === TontineType.AUCTION) {
+        fundDefs.push({
+          type: FundType.DIVIDEND,
+          name: 'Caisse des dividendes',
+        });
+      }
+      const funds = fundDefs.map((f) =>
         manager.create(Fund, {
           tontineId: saved.id,
           name: f.name,

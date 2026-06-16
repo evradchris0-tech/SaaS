@@ -20,7 +20,11 @@ export class AuctionStrategy implements TontineStrategy {
     for (let i = 0; i < totalRounds; i++) {
       const round = new Round();
       round.index = i + 1;
-      round.expectedAmount = ruleSet.contribution.amountPerShare;
+      // La cagnotte du tour = somme des cotisations de tous les membres (le pot),
+      // identique à la stratégie ROTATING. C'est ce pot, diminué de l'escompte de
+      // l'enchère gagnante, qui est décaissé au bénéficiaire.
+      round.expectedAmount =
+        ruleSet.contribution.amountPerShare * members.length;
       round.dueDate = new Date(currentDate);
       round.status = RoundStatus.SCHEDULED;
 
@@ -60,7 +64,7 @@ export class AuctionStrategy implements TontineStrategy {
     return 0;
   }
 
-  async determineBeneficiary(
+  determineBeneficiary(
     round: Round,
     members: Membership[],
     pastRounds: Round[],
@@ -74,7 +78,7 @@ export class AuctionStrategy implements TontineStrategy {
     const eligibleMembers = members.filter((m) => !previousWinners.has(m.id));
 
     if (eligibleMembers.length === 0) {
-      return null;
+      return Promise.resolve(null);
     }
 
     if (round.bids && round.bids.length > 0) {
@@ -93,18 +97,18 @@ export class AuctionStrategy implements TontineStrategy {
         });
 
         const winningBid = eligibleBids[0];
-        return {
+        return Promise.resolve({
           membershipId: winningBid.membershipId,
           discountAmount: Number(winningBid.discountAmount),
-        };
+        });
       }
     }
 
     // Fallback: Random draw among eligible members
     const randomIndex = Math.floor(Math.random() * eligibleMembers.length);
-    return {
+    return Promise.resolve({
       membershipId: eligibleMembers[randomIndex].id,
       discountAmount: 0,
-    };
+    });
   }
 }
